@@ -12,7 +12,8 @@ class CounterScreen extends StatefulWidget {
 }
 
 class _CounterScreenState extends State<CounterScreen> {
-  Timer? _timer;
+  Timer? _incrementTimer;
+  Timer? _decrementTimer;
   bool _isRocketFlying = false;
   double _rocketPosition = 0;
   final GlobalKey _counterKey = GlobalKey();
@@ -33,9 +34,10 @@ class _CounterScreenState extends State<CounterScreen> {
       _updateRocketPosition();
     });
     context.read<CounterBloc>().add(IncrementEvent());
-    _timer = Timer.periodic(Duration(milliseconds: 200), (timer) {
+    _incrementTimer = Timer.periodic(Duration(milliseconds: 200), (timer) {
       context.read<CounterBloc>().add(IncrementEvent());
     });
+    _decrementTimer?.cancel();
   }
 
   void _startDecrement(BuildContext context) {
@@ -44,13 +46,14 @@ class _CounterScreenState extends State<CounterScreen> {
       _updateRocketPosition();
     });
     context.read<CounterBloc>().add(DecrementEvent());
-    _timer = Timer.periodic(Duration(milliseconds: 200), (timer) {
+    _incrementTimer = Timer.periodic(Duration(milliseconds: 200), (timer) {
       context.read<CounterBloc>().add(DecrementEvent());
     });
+    _decrementTimer?.cancel();
   }
 
-  void _stopAction() {
-    _timer?.cancel();
+  void _stopAction(BuildContext context) {
+    _incrementTimer?.cancel();
     setState(() {
       _rocketPosition = MediaQuery.of(context).size.height;
     });
@@ -58,6 +61,10 @@ class _CounterScreenState extends State<CounterScreen> {
       if (mounted) {
         setState(() {
           _isRocketFlying = false;
+        });
+        _decrementTimer?.cancel();
+        _decrementTimer = Timer.periodic(Duration(seconds: 3), (timer) {
+          context.read<CounterBloc>().add(DecrementBy1000Event());
         });
       }
     });
@@ -85,13 +92,19 @@ class _CounterScreenState extends State<CounterScreen> {
               ),
             ),
           ),
-          AnimatedPositioned(
-            duration: Duration(milliseconds: 500),
-            top: _rocketPosition,
-            left: MediaQuery.of(context).size.width / 2 - 25,
-            child: _isRocketFlying
-                ? Icon(Icons.rocket_launch, size: 50, color: Colors.redAccent)
-                : SizedBox(),
+          BlocBuilder<CounterBloc, CounterState>(
+            builder: (context, state) {
+              final animationSpeed = (state.counter > 0 ? 1000 ~/ state.counter.clamp(1, 1000) : 500)
+                  .clamp(100, 1000);
+              return AnimatedPositioned(
+                duration: Duration(milliseconds: animationSpeed),
+                top: _rocketPosition,
+                left: MediaQuery.of(context).size.width / 2 - 25,
+                child: _isRocketFlying
+                    ? Icon(Icons.rocket_launch, size: 50, color: Colors.redAccent)
+                    : SizedBox(),
+              );
+            },
           ),
           Center(
             child: Column(
@@ -124,7 +137,7 @@ class _CounterScreenState extends State<CounterScreen> {
                     GestureDetector(
                       onTap: () => context.read<CounterBloc>().add(DecrementEvent()),
                       onLongPressStart: (_) => _startDecrement(context),
-                      onLongPressEnd: (_) => _stopAction(),
+                      onLongPressEnd: (_) => _stopAction(context),
                       child: Container(
                         width: 80,
                         height: 80,
@@ -146,7 +159,7 @@ class _CounterScreenState extends State<CounterScreen> {
                     GestureDetector(
                       onTap: () => context.read<CounterBloc>().add(IncrementEvent()),
                       onLongPressStart: (_) => _startIncrement(context),
-                      onLongPressEnd: (_) => _stopAction(),
+                      onLongPressEnd: (_) => _stopAction(context),
                       child: Container(
                         width: 80,
                         height: 80,
@@ -176,7 +189,8 @@ class _CounterScreenState extends State<CounterScreen> {
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _incrementTimer?.cancel();
+    _decrementTimer?.cancel();
     super.dispose();
   }
 }
